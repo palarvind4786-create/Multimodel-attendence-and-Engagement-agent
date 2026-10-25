@@ -115,6 +115,21 @@ class AttendanceService:
                 )
             )
             record = res.scalars().first()
+
+            # Clean up prior unverified placeholder for this track_id if it existed
+            unv_res = await db.execute(
+                select(AttendanceRecord).where(
+                    AttendanceRecord.session_id == session_id,
+                    AttendanceRecord.tracking_track_id == track_id,
+                    AttendanceRecord.student_id == None
+                )
+            )
+            unv_record = unv_res.scalars().first()
+            if unv_record:
+                if record:
+                    record.observation_count += unv_record.observation_count
+                    record.sustained_duration_seconds += unv_record.sustained_duration_seconds
+                await db.delete(unv_record)
         else:
             # Check if this track_id already has an unverified record
             res = await db.execute(

@@ -156,13 +156,15 @@ class StudentService:
         return True
 
     @staticmethod
-    async def load_all_consented_embeddings(db: AsyncSession) -> List[Tuple[Student, np.ndarray]]:
+    async def load_all_consented_embeddings(db: AsyncSession, course_name: Optional[str] = None) -> List[Tuple[Student, np.ndarray]]:
         """Loads valid embeddings in memory for high-speed local cosine matching during sessions."""
         query = select(Student).where(
             Student.is_archived == False,
             Student.has_consented == True,
             Student.embedding_path != None
         )
+        if course_name:
+            query = query.where(Student.course_name == course_name)
         result = await db.execute(query)
         students = result.scalars().all()
         

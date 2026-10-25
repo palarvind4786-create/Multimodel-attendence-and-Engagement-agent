@@ -5,6 +5,8 @@ __pycache__/
 *.so
 .Python
 env/
+venv/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -31,9 +33,16 @@ yarn-debug.log*
 yarn-error.log*
 
 # Database & Uploads
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+backend/data/db/*.db
+!backend/data/db/.gitkeep
+backend/data/embeddings/*.npy
+!backend/data/embeddings/.gitkeep
 data/uploads/*
 !data/uploads/.gitkeep
 data/db/*.db
+!data/db/.gitkeep
 data/embeddings/*.npy
 !data/embeddings/.gitkeep
 

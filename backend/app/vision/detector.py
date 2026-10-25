@@ -7,14 +7,17 @@ class PersonDetector:
         self.confidence_threshold = confidence_threshold
         self.yolo_model = None
         self.use_fallback = False
+        self.device = "cpu"
         
         try:
+            import torch
             from ultralytics import YOLO
+            self.device = 0 if torch.cuda.is_available() else "cpu"
             self.yolo_model = YOLO("yolov8n.pt")
             # Warm up
-            _ = self.yolo_model(np.zeros((320, 320, 3), dtype=np.uint8), verbose=False)
+            _ = self.yolo_model(np.zeros((320, 320, 3), dtype=np.uint8), device=self.device, verbose=False)
         except Exception as e:
-            print(f"[PersonDetector] YOLOv8 could not be initialized ({e}). Using OpenCV HOG fallback.")
+            print(f"[PersonDetector] YOLOv8 init warning ({e}). Using OpenCV HOG fallback.")
             self.use_fallback = True
             self.hog = cv2.HOGDescriptor()
             self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
@@ -32,7 +35,13 @@ class PersonDetector:
 
         if not self.use_fallback and self.yolo_model is not None:
             try:
-                results = self.yolo_model(frame, classes=[0], conf=self.confidence_threshold, verbose=False)
+                results = self.yolo_model(
+                    frame,
+                    classes=[0],
+                    conf=self.confidence_threshold,
+                    device=self.device,
+                    verbose=False
+                )
                 for r in results:
                     for box in r.boxes:
                         coords = box.xyxy[0].cpu().numpy().astype(int)
@@ -45,7 +54,9 @@ class PersonDetector:
                             boxes.append((x1, y1, x2, y2, conf))
                 return boxes
             except Exception as e:
-                print(f"[PersonDetector] Inference error: {e}, falling back to HOG.")
+                print(f"[PersonDetector] Inference error on {self.device}: {e}, attempting CPU/HOG fallback.")
+                if self.device != "cpu":
+                    self.device = "cpu"
 
         # Fallback HOG person detector
         if hasattr(self, 'hog'):

@@ -12,11 +12,13 @@ from app.core.config import settings
 from app.services.student_service import StudentService
 from app.services.session_service import SessionService
 from app.services.attendance_service import AttendanceService
+from app.services.suggestion_service import SuggestionService
 from app.vision.pipeline import MultimodalPipeline
 from app.models.db_models import Session
 
 router = APIRouter()
 pipeline = MultimodalPipeline()
+suggestion_service = SuggestionService()
 
 # In-memory job tracker for video upload background processing
 ACTIVE_JOBS: Dict[str, Dict] = {}
@@ -28,8 +30,10 @@ async def run_video_processing_task(job_id: str, session_id: int, video_path: st
 
     async with AsyncSessionLocal() as db:
         try:
-            # Load consented student embeddings
-            enrolled = await StudentService.load_all_consented_embeddings(db)
+            # Load consented student embeddings strictly for this session's enrolled cohort
+            session_obj = await SessionService.get_by_id(db, session_id)
+            target_class = session_obj.target_class if session_obj else None
+            enrolled = await StudentService.load_all_consented_embeddings(db, course_name=target_class)
             enrolled_cache = [(s.id, s.full_name, emb) for s, emb in enrolled]
 
             def update_progress(prog: float, msg: str):
@@ -49,6 +53,12 @@ async def run_video_processing_task(job_id: str, session_id: int, video_path: st
                 progress_callback=update_progress,
                 cancel_check=cancel_check
             )
+
+            # Auto-generate teaching suggestions from actual processed windows
+            try:
+                await suggestion_service.generate_and_save_for_session(db, session_id)
+            except Exception as e:
+                print(f"[VideoProcessing] Notice generating suggestions: {e}")
 
             # Mark session as completed
             await SessionService.update_status(db, session_id, "COMPLETED")
@@ -150,7 +160,9 @@ async def process_live_frame(
     if frame is None:
         raise HTTPException(status_code=400, detail="Invalid frame image format.")
 
-    enrolled = await StudentService.load_all_consented_embeddings(db)
+    session_obj = await SessionService.get_by_id(db, session_id)
+    target_class = session_obj.target_class if session_obj else None
+    enrolled = await StudentService.load_all_consented_embeddings(db, course_name=target_class)
     enrolled_cache = [(s.id, s.full_name, emb) for s, emb in enrolled]
 
     # Detect

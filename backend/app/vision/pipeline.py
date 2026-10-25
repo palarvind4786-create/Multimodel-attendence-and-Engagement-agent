@@ -4,6 +4,7 @@ import numpy as np
 from typing import List, Tuple, Dict, Optional, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import delete
 
 from app.vision.detector import PersonDetector
 from app.vision.tracker import MultiPersonTracker
@@ -167,6 +168,9 @@ class MultimodalPipeline:
 
         finally:
             cap.release()
+
+        # Clear any prior engagement windows for this session to avoid duplicates on re-analysis
+        await db.execute(delete(EngagementWindow).where(EngagementWindow.session_id == session_id))
 
         # Build and store EngagementWindow records
         created_windows = []
