@@ -4,6 +4,26 @@ An offline-first, privacy-preserving classroom intelligence application that com
 
 ---
 
+## 🚀 Live Streamlit Web App (1-Click Deployment)
+
+This repository includes a native, full-featured **Streamlit Web Application** ready for free 1-click cloud deployment on **Streamlit Community Cloud** or local execution!
+
+### ☁️ Deploy on Streamlit Community Cloud:
+1. Go to **[share.streamlit.io](https://share.streamlit.io/)** and sign in with GitHub.
+2. Click **Create app** > **I already have an app**.
+3. Select your repository: `palarvind4786-create/Multimodel-attendence-and-Engagement-agent`
+4. Set Branch: `main`
+5. Set Main file path: `streamlit_app.py`
+6. Click **Deploy!** 🎉
+
+### 💻 Run Streamlit App Locally:
+```bash
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+---
+
 ## 1. System Architecture
 
 ```
