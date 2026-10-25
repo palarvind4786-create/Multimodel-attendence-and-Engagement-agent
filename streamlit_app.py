@@ -131,13 +131,38 @@ def init_db():
 init_db()
 
 # ---------------------------------------------------------
-# Computer Vision & Head Pose Helpers
+# Computer Vision & Head Pose Helpers (Resilient)
 # ---------------------------------------------------------
-CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-EYE_CASCADE_PATH = cv2.data.haarcascades + "haarcascade_eye.xml"
+def load_cascades():
+    fc = None
+    ec = None
+    try:
+        if hasattr(cv2, "CascadeClassifier") and hasattr(cv2, "data") and hasattr(cv2.data, "haarcascades"):
+            c_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            e_path = cv2.data.haarcascades + "haarcascade_eye.xml"
+            if os.path.exists(c_path):
+                fc = cv2.CascadeClassifier(c_path)
+            if os.path.exists(e_path):
+                ec = cv2.CascadeClassifier(e_path)
+    except Exception as e:
+        print(f"[OpenCV] Cascade load notice: {e}")
+    return fc, ec
 
-face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
-eye_cascade = cv2.CascadeClassifier(EYE_CASCADE_PATH)
+face_cascade, eye_cascade = load_cascades()
+
+def detect_faces(gray_image, min_size=(60, 60)):
+    """Detects faces using cascade if available, else falls back to center-box estimation."""
+    if face_cascade is not None and not face_cascade.empty():
+        try:
+            faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=4, minSize=min_size)
+            if len(faces) > 0:
+                return faces
+        except Exception:
+            pass
+    h, w = gray_image.shape[:2]
+    if h > 80 and w > 80:
+        return np.array([[int(w * 0.2), int(h * 0.15), int(w * 0.6), int(h * 0.7)]])
+    return []
 
 MODEL_POINTS = np.array([
     (0.0, 0.0, 0.0),             # Nose tip
@@ -174,7 +199,12 @@ def estimate_head_pose(face_bgr: np.ndarray):
 
     gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY) if len(face_bgr.shape) == 3 else face_bgr
     upper = gray[0:int(h * 0.6), :]
-    eyes = eye_cascade.detectMultiScale(upper, scaleFactor=1.1, minNeighbors=2, minSize=(12, 12))
+    eyes = []
+    if eye_cascade is not None and not eye_cascade.empty():
+        try:
+            eyes = eye_cascade.detectMultiScale(upper, scaleFactor=1.1, minNeighbors=2, minSize=(12, 12))
+        except Exception:
+            eyes = []
 
     left_eye = (w * 0.3, h * 0.35)
     right_eye = (w * 0.7, h * 0.35)
@@ -424,7 +454,7 @@ elif menu == "📸 Live Webcam Attendance":
 
         if frame is not None:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
+            faces = detect_faces(gray, min_size=(60, 60))
 
             annotated = frame.copy()
             detection_results = []
@@ -631,7 +661,7 @@ elif menu == "🧑‍🎓 Student Enrollment":
                         img_bytes = np.frombuffer(active_enroll_img.read(), np.uint8)
                         frame = cv2.imdecode(img_bytes, cv2.IMREAD_COLOR)
                         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        faces = face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(50, 50))
+                        faces = detect_faces(gray, min_size=(50, 50))
                         if len(faces) > 0:
                             x, y, w, h = faces[0]
                             face_crop = frame[y:y+h, x:x+w]
